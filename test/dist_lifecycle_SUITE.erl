@@ -29,7 +29,9 @@ init_per_suite(Config) ->
     application:load(erleans),
     application:set_env(partisan, peer_port, 10200),
     application:set_env(partisan, pid_encoding, false),
-    application:set_env(partisan, partisan_peer_service_manager, partisan_pluggable_peer_service_manager),
+    application:set_env(
+        partisan, partisan_peer_service_manager, partisan_pluggable_peer_service_manager
+    ),
     %% lower gossip interval of partisan membership so it triggers more often
     %% in tests
     application:set_env(partisan, periodic_enabled, true),
@@ -49,17 +51,13 @@ end_per_suite(_Config) ->
     application:unload(erleans),
     application:unload(bondy_mst),
 
-    {ok, _} = ct_slave:stop(?NODE_A),
+    {ok, _} = erpc:call(?NODE_A, init, stop, []),
+
     ok.
-
-
-
 
 %% =============================================================================
 %% TEST CASES
 %% =============================================================================
-
-
 
 manual_start_stop(_Config) ->
     ok = join_nodes(),
@@ -99,17 +97,17 @@ manual_start_stop(_Config) ->
 
     ok.
 
-
 activate_callback(_Config) ->
     ok = join_nodes(),
     meck:new(test_grain, [passthrough]),
-    meck:expect(test_grain, placement,
+    meck:expect(
+        test_grain,
+        placement,
         fun() -> {callback, ?MODULE, activate_callback_placement} end
     ),
     Grain3 = erleans:get_grain(test_grain, <<"grain3">>),
     Expected = activate_callback_placement(Grain3),
     ?assertEqual({ok, Expected}, test_grain:node(Grain3)).
-
 
 deduplication(_Config) ->
     GrainRef = erleans:get_grain(test_grain, <<"grain1">>),
@@ -133,7 +131,9 @@ deduplication(_Config) ->
     meck:new(erleans_pm, [passthrough]),
     meck:new(erleans_grain, [passthrough]),
 
-    meck:expect(erleans_pm, is_reachable,
+    meck:expect(
+        erleans_pm,
+        is_reachable,
         fun
             (P) when P == RemoteProcRef ->
                 true;
@@ -142,11 +142,12 @@ deduplication(_Config) ->
         end
     ),
 
-    meck:expect(erleans_grain, is_location_right,
+    meck:expect(
+        erleans_grain,
+        is_location_right,
         fun
             (G, P) when G == GrainRef andalso P == RemoteProcRef ->
                 true;
-
             (_, _) ->
                 %% The local ref
                 false
@@ -169,7 +170,6 @@ deduplication(_Config) ->
         rpc:call(?NODE_A, erleans_pm, lookup, [GrainRef])
     ),
 
-
     meck:unload(erleans_pm),
     meck:unload(erleans_grain),
 
@@ -179,22 +179,21 @@ deduplication(_Config) ->
 %% PRIVATE
 %% =============================================================================
 
-
 start_nodes() ->
-    Nodes = [{?NODE_A, 10201}], %, b, c, d],
+    %, b, c, d],
+    Nodes = [{?NODE_A, 10201}],
     ct:log("Starting nodes ~p", [Nodes]),
     start_nodes(Nodes, []).
 
 start_nodes([], Acc) ->
     Acc;
-
 %% start_nodes([{Node, PeerPort} | T], Acc) ->
 %%     ct:log("Starting node ~p", [Node]),
 %%     CodePath = code:get_path(),
 %%     Paths = lists:flatten([["-pa ", Path, " "] || Path <- CodePath]),
 %%     ErlFlags = "-config ../../../../test/sys.config " ++ Paths,
 
-%%     {ok, HostNode} = ct_slave:start(Node,[
+%%     {ok, HostNode} = ?CT_PEER(#{name => Node},[
 %%         {kill_if_fail, true},
 %%         {monitor_master, true},
 %%         {init_timeout, 3000},
@@ -228,12 +227,17 @@ start_nodes([], Acc) ->
 start_nodes([{Node, PeerPort} | T], Acc) ->
     CodePath = code:get_path(),
     Paths = "-pa " ++ lists:flatten([[Path, " "] || Path <- CodePath]),
-    StartupFuns =  [
-        {logger, set_handler_config, [default, config,
+    StartupFuns = [
+        {logger, set_handler_config, [
+            default,
+            config,
             #{file => "log/ct_console.log"}
         ]},
-        {logger, set_handler_config, [default, formatter,
-         {logger_formatter, #{}}]},
+        {logger, set_handler_config, [
+            default,
+            formatter,
+            {logger_formatter, #{}}
+        ]},
         {application, load, [partisan]},
         {application, load, [bondy_mst]},
         {application, load, [erleans]},
@@ -241,7 +245,9 @@ start_nodes([{Node, PeerPort} | T], Acc) ->
         {application, set_env, [partisan, periodic_enabled, true]},
         {application, set_env, [partisan, periodic_interval, 100]},
         {application, set_env, [partisan, peer_port, PeerPort]},
-        {application, set_env, [partisan, partisan_peer_service_manager, partisan_pluggable_peer_service_manager]},
+        {application, set_env, [
+            partisan, partisan_peer_service_manager, partisan_pluggable_peer_service_manager
+        ]},
         {application, ensure_all_started, [partisan]},
         {application, ensure_all_started, [bondy_mst]},
         {application, ensure_all_started, [erleans]}
@@ -266,18 +272,18 @@ start_nodes([{Node, PeerPort} | T], Acc) ->
     true = net_kernel:connect_node(Node),
     start_nodes(T, [HostNode | Acc]).
 
-
-
 join_nodes() ->
-    rpc:call(?NODE_A, partisan_peer_service, join, [#{
-        name => ?NODE_CT,
-        listen_addrs => [#{ip => {127,0,0,1}, port => 10200}],
-        parallelism => 1}
+    rpc:call(?NODE_A, partisan_peer_service, join, [
+        #{
+            name => ?NODE_CT,
+            listen_addrs => [#{ip => {127, 0, 0, 1}, port => 10200}],
+            parallelism => 1
+        }
     ]),
 
     ok = partisan_peer_service:join(#{
         name => ?NODE_A,
-        listen_addrs => [#{ip => {127,0,0,1}, port => 10201}],
+        listen_addrs => [#{ip => {127, 0, 0, 1}, port => 10201}],
         parallelism => 1
     }),
 
@@ -286,6 +292,3 @@ join_nodes() ->
 %% used by activate_callback
 activate_callback_placement(_GrainRef) ->
     ?NODE_A.
-
-
-

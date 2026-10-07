@@ -620,7 +620,11 @@ maybe_remove_worker(_) ->
 maybe_unregister(#{placement := {stateless, _}}) ->
     ok;
 maybe_unregister(_GrainRef) ->
-    _ = catch erleans_pm:unregister_name(),
+    try
+        erleans_pm:unregister_name()
+    catch
+        _:_ -> ok
+    end,
     ok.
 
 upd_timer(leave_timer, _) ->
